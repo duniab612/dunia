@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>2026CIJPM拼图大师赛成绩查询</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei"; }
+        body { max-width: 900px; margin: 30px auto; padding: 0 20px; background: #f5f7fa; }
+        .title { text-align: center; margin-bottom: 20px; color: #333; }
+        
+        .search-box {
+            background: white; padding: 15px 20px; border-radius: 10px;
+            text-align: center; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .search-box input {
+            padding: 10px 15px; width: 220px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;
+        }
+        .search-box button {
+            padding: 10px 20px; background: #409eff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 8px;
+        }
+        .search-box button:hover { background: #337ecc; }
+
+        .group-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 20px; }
+        .group-btn { padding: 8px 16px; background: #67c23a; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .group-btn.active { background: #409eff; }
+        .group-title { text-align: center; margin-bottom: 15px; font-size: 18px; font-weight: bold; }
+        .result-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .result-table th { background: #409eff; color: white; padding: 12px; text-align: center; }
+        .result-table td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; }
+        .empty-tip { text-align: center; color: #999; padding: 30px; }
+        .highlight { background-color: #e3f2ff; transition: all 0.3s; }
+    </style>
+</head>
+<body>
+    <h1 class="title">2026CIJPM拼图大师赛成绩查询</h1>
+
+    <div class="search-box">
+        <input type="text" id="searchName" placeholder="请输入你的真实姓名">
+        <button onclick="searchPerson()">查询成绩</button>
+    </div>
+
+    <div class="group-buttons" id="group-buttons"></div>
+    <div class="group-title" id="current-group"></div>
+
+    <table class="result-table">
+        <thead>
+            <tr>
+                <th>名次</th>
+                <th>姓名</th>
+                <th>用时</th>
+            </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+    </table>
+
+<script>
+let allData = null;
+let currentGroup = '';
+
+// 前端姓名脱敏（已修复：两字中间加*）
+function maskName(name) {
+    if (!name) return "";
+    if (/[a-zA-Z]/.test(name)) return name;
+    const len = name.length;
+  
+    if (len === 2) {
+        return name[0] + "*" + name[1]; // 张三 → 张*三
+    }
+    if (len >= 3) {
+        return name[0] + "*" + name.slice(2); // 张三丰→张*丰，欧阳娜娜→欧*娜娜
+    }
+    return name;
+}
+
+function loadData() {
+    const data = localStorage.getItem("competition_data");
+    if (!data) {
+        document.getElementById("table-body").innerHTML = `<tr><td colspan="3" class="empty-tip">暂无成绩数据</td></tr>`;
+        return null;
+    }
+    return JSON.parse(data);
+}
+
+function createButtons(data) {
+    const container = document.getElementById("group-buttons");
+    container.innerHTML = "";
+    const groups = Object.keys(data);
+    groups.forEach((g, i) => {
+        const btn = document.createElement("button");
+        btn.className = "group-btn";
+        btn.innerText = g;
+        btn.onclick = () => show(g);
+        container.appendChild(btn);
+        if (i === 0) btn.click();
+    });
+}
+
+function show(group) {
+    allData = loadData();
+    if (!allData) return;
+    currentGroup = group;
+    const list = allData[group] || [];
+    const tb = document.getElementById("table-body");
+    document.getElementById("current-group").innerText = "当前组别：" + group;
+
+    document.querySelectorAll(".group-btn").forEach(b => b.classList.remove("active"));
+    [...document.querySelectorAll(".group-btn")].find(b => b.innerText === group)?.classList.add("active");
+
+    if (list.length === 0) {
+        tb.innerHTML = `<tr><td colspan="3" class="empty-tip">无数据</td></tr>`;
+        return;
+    }
+
+    tb.innerHTML = list.map((item, i) => `
+    <tr data-name="${item.姓名}">
+        <td>${i + 1}</td>
+        <td>${maskName(item.姓名)}</td>
+        <td>${item._display}</td>
+    </tr>`).join("");
+}
+
+function searchPerson() {
+    const key = document.getElementById("searchName").value.trim();
+    if (!key) { alert("请输入姓名"); return; }
+
+    const rows = document.querySelectorAll("tr[data-name]");
+    let found = false;
+
+    rows.forEach(row => {
+        row.classList.remove("highlight");
+        const name = row.getAttribute("data-name");
+        if (name === key) {
+            row.classList.add("highlight");
+            row.scrollIntoView({ behavior: "smooth", block: "center" });
+            found = true;
+        }
+    });
+
+    if (!found) {
+        alert("未找到该姓名，请检查输入或切换组别！");
+    }
+}
+
+window.onload = () => {
+    allData = loadData();
+    if (allData) createButtons(allData);
+};
+</script>
+  <h1>数据表内容</h1>
+    <!-- 表格将显示在这里 -->
+    <div id="table-container"></div>
+
+    <script>
+        // 1. 获取存放表格的容器
+        const container = document.getElementById('table-container');
+
+        // 2. 使用 fetch 加载 data.json 文件
+        fetch('data.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();   // 解析为 JSON
+            })
+            .then(data => {
+                // 3. 检查数据是否为数组且不为空
+                if (!Array.isArray(data) || data.length === 0) {
+                    container.innerHTML = '<p>没有数据或数据格式错误</p>';
+                    return;
+                }
+
+                // 4. 获取所有列名（对象的键）
+                const columns = Object.keys(data[0]);
+
+                // 5. 创建表格元素
+                const table = document.createElement('table');
+                
+                // 6. 创建表头 <thead>
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                columns.forEach(col => {
+                    const th = document.createElement('th');
+                    th.textContent = col;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+
+                // 7. 创建表体 <tbody>
+                const tbody = document.createElement('tbody');
+                data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    columns.forEach(col => {
+                        const td = document.createElement('td');
+                        td.textContent = row[col];   // 获取该行该列的值
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+
+                // 8. 把表格放入页面容器中
+                container.appendChild(table);
+            })
+            .catch(error => {
+                console.error('加载数据失败:', error);
+                container.innerHTML = `<p style="color:red;">加载数据失败，请检查 data.json 文件是否存在或格式是否正确。</p>`;
+            });
+    </script>
+</body>
+</html>
