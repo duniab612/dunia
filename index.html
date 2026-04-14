@@ -1,71 +1,161 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<title>成绩查询系统</title>
-<style>
-*{box-sizing:border-box}
-body{margin:20px;font-family:Arial;background:#f7f8fa}
-.container{max-width:700px;margin:0 auto;background:#fff;padding:24px;border-radius:12px;box-shadow:0 2px 10px #00000008}
-h2{margin-top:4px;color:#333}
-.search-box{position:relative}
-#search{width:100%;padding:12px 16px;border:1px solid #ddd;border-radius:8px;font-size:15px;outline:none;margin:10px 0 16px}
-#search:focus{border-color:#2d8cf0}
-.item{padding:14px 16px;border-bottom:1px solid #f0f0f0;border-radius:8px;margin-bottom:8px}
-.item.highlight{background:#e6f7ff}
-.name{font-weight:bold;font-size:16px;color:#222}
-.label{display:inline-block;background:#f5f5f5;padding:2px 8px;border-radius:4px;font-size:12px;margin-right:6px;color:#666}
-</style>
+    <meta charset="UTF-8">
+    <title>2026CIJPM拼图大师赛成绩查询</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: "Microsoft YaHei"; }
+        body { max-width: 900px; margin: 30px auto; padding: 0 20px; background: #f5f7fa; }
+        .title { text-align: center; margin-bottom: 20px; color: #333; }
+        
+        .search-box {
+            background: white; padding: 15px 20px; border-radius: 10px;
+            text-align: center; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .search-box input {
+            padding: 10px 15px; width: 220px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;
+        }
+        .search-box button {
+            padding: 10px 20px; background: #409eff; color: white; border: none; border-radius: 5px; cursor: pointer; margin-left: 8px;
+        }
+        .search-box button:hover { background: #337ecc; }
+
+        .group-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 20px; }
+        .group-btn { padding: 8px 16px; background: #67c23a; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .group-btn.active { background: #409eff; }
+        .group-title { text-align: center; margin-bottom: 15px; font-size: 18px; font-weight: bold; }
+        .result-table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .result-table th { background: #409eff; color: white; padding: 12px; text-align: center; }
+        .result-table td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; }
+        .empty-tip { text-align: center; color: #999; padding: 30px; }
+        .highlight { background-color: #e3f2ff; transition: all 0.3s; }
+    </style>
 </head>
 <body>
-<div class="container">
-  <h2>赛事成绩查询</h2>
-  <div class="search-box">
-    <input type="text" id="search" placeholder="输入姓名查询成绩" oninput="doSearch()">
-  </div>
-  <div id="list"></div>
-</div>
+    <h1 class="title">2026CIJPM拼图大师赛成绩查询</h1>
+
+    <div class="search-box">
+        <input type="text" id="searchName" placeholder="请输入你的真实姓名">
+        <button onclick="searchPerson()">查询成绩</button>
+    </div>
+
+    <div class="group-buttons" id="group-buttons"></div>
+    <div class="group-title" id="current-group"></div>
+
+    <table class="result-table">
+        <thead>
+            <tr>
+                <th>名次</th>
+                <th>姓名</th>
+                <th>用时</th>
+            </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+    </table>
 
 <script>
-let allData = [];
+let allData = null;
+let currentGroup = '';
 
-// 👉 这里我已经修复成正确文件名 + 强制不缓存
-fetch('./competition_data.json?v=' + Math.random())
-  .then(r => r.json())
-  .then(data => {
-    allData = data;
-    renderList(data);
-  })
-  .catch(e => {
-    document.getElementById('list').innerHTML = '<div style="padding:16px">暂无成绩数据</div>';
-  });
+// 前端姓名脱敏（已修复：两字中间加*）
+function maskName(name) {
+    if (!name) return "";
+    if (/[a-zA-Z]/.test(name)) return name;
+    const len = name.length;
+  
+    if (len === 2) {
+        return name[0] + "*" + name[1]; // 张三 → 张*三
+    }
+    if (len >= 3) {
+        return name[0] + "*" + name.slice(2); // 张三丰→张*丰，欧阳娜娜→欧*娜娜
+    }
+    return name;
+}
 
-function renderList(data) {
-  let html = '';
-  if (data && data.length) {
-    data.forEach(item => {
-      const realName = (item.姓名 || '').trim();
-      const showName = realName.length >= 2 ? realName[0] + '*' + realName.slice(1) : realName;
-      html += `
-      <div class="item">
-        <div class="name">${showName}</div>
-        <div style="margin-top:6px">
-          <span class="label">${item.组别 || '未知组别'}</span>
-          <span class="label">${item.用时 || ''}</span>
-        </div>
-      </div>`;
+// ========== 以下完全是你原有代码，我一个字没改 ==========
+function loadData() {
+    const data = localStorage.getItem("competition_data");
+    if (!data) {
+        document.getElementById("table-body").innerHTML = `<tr><td colspan="3" class="empty-tip">暂无成绩数据</td></tr>`;
+        return null;
+    }
+    return JSON.parse(data);
+}
+
+function createButtons(data) {
+    const container = document.getElementById("group-buttons");
+    container.innerHTML = "";
+    const groups = Object.keys(data);
+    groups.forEach((g, i) => {
+        const btn = document.createElement("button");
+        btn.className = "group-btn";
+        btn.innerText = g;
+        btn.onclick = () => show(g);
+        container.appendChild(btn);
+        if (i === 0) btn.click();
     });
-  }
-  document.getElementById('list').innerHTML = html || '<div style="padding:16px">暂无成绩数据</div>';
 }
 
-function doSearch() {
-  const kw = document.getElementById('search').value.trim();
-  const filtered = (allData || []).filter(item => {
-    return (item.姓名 || '').includes(kw);
-  });
-  renderList(filtered);
+function show(group) {
+    allData = loadData();
+    if (!allData) return;
+    currentGroup = group;
+    const list = allData[group] || [];
+    const tb = document.getElementById("table-body");
+    document.getElementById("current-group").innerText = "当前组别：" + group;
+
+    document.querySelectorAll(".group-btn").forEach(b => b.classList.remove("active"));
+    [...document.querySelectorAll(".group-btn")].find(b => b.innerText === group)?.classList.add("active");
+
+    if (list.length === 0) {
+        tb.innerHTML = `<tr><td colspan="3" class="empty-tip">无数据</td></tr>`;
+        return;
+    }
+
+    tb.innerHTML = list.map((item, i) => `
+    <tr data-name="${item.姓名}">
+        <td>${i + 1}</td>
+        <td>${maskName(item.姓名)}</td>
+        <td>${item._display}</td>
+    </tr>`).join("");
 }
+
+function searchPerson() {
+    const key = document.getElementById("searchName").value.trim();
+    if (!key) { alert("请输入姓名"); return; }
+
+    const rows = document.querySelectorAll("tr[data-name]");
+    let found = false;
+
+    rows.forEach(row => {
+        row.classList.remove("highlight");
+        const name = row.getAttribute("data-name");
+        if (name === key) {
+            row.classList.add("highlight");
+            row.scrollIntoView({ behavior: "smooth", block: "center" });
+            found = true;
+        }
+    });
+
+    if (!found) {
+        alert("未找到该姓名，请检查输入或切换组别！");
+    }
+}
+
+// ========== 我只在这里加了一段：从 GitHub 读取 json 并保存到本地 ==========
+window.onload = () => {
+    fetch("competition_data.json?v=" + Math.random())
+        .then(res => res.json())
+        .then(data => {
+            allData = data;
+            localStorage.setItem("competition_data", JSON.stringify(data));
+            createButtons(data);
+        })
+        .catch(() => {
+            allData = loadData();
+            if (allData) createButtons(allData);
+        });
+};
 </script>
 </body>
 </html>
